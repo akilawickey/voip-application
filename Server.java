@@ -1,72 +1,40 @@
-import java.io.ByteArrayInputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.SourceDataLine;
+public class Server extends Thread {
 
-public class Server {
+     DatagramSocket socket = null;
+     boolean listen = true;
 
-    AudioInputStream audioInputStream;
-    static AudioInputStream ais;
-    static AudioFormat format;
-    static boolean status = true;
-    static int port = 50005;
-    static int sampleRate = 16000;
 
-    static DataLine.Info dataLineInfo;
-    static SourceDataLine sourceDataLine;
+    public void run() {
+        byte[] buf = new byte[100];
 
-    public static void main(String args[]) throws Exception 
-    {
-        System.out.println("Server started at port:"+port);
-
-        DatagramSocket serverSocket = new DatagramSocket(port);
-
-        /**
-         * Formula for lag = (byte_size/sample_rate)*2
-         * Byte size 9728 will produce ~ 0.45 seconds of lag. Voice slightly broken.
-         * Byte size 1400 will produce ~ 0.06 seconds of lag. Voice extremely broken.
-         * Byte size 4000 will produce ~ 0.18 seconds of lag. Voice slightly more broken then 9728.
-         */
-
-        byte[] receiveData = new byte[4096];
-
-        format = new AudioFormat(sampleRate, 16, 2, true, false);
-        dataLineInfo = new DataLine.Info(SourceDataLine.class, format);
-        sourceDataLine = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
-        sourceDataLine.open(format);
-        sourceDataLine.start();
-
-        //FloatControl volumeControl = (FloatControl) sourceDataLine.getControl(FloatControl.Type.MASTER_GAIN);
-        //volumeControl.setValue(1.00f);
-
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-        ByteArrayInputStream baiss = new ByteArrayInputStream(receivePacket.getData());
-
-        while (status == true) 
-        {
-            serverSocket.receive(receivePacket);
-            ais = new AudioInputStream(baiss, format, receivePacket.getLength());
-            toSpeaker(receivePacket.getData());
+        try{
+        DatagramSocket socket= new DatagramSocket(2127);    
+        DatagramPacket packet = new DatagramPacket(buf, buf.length);
+        
+        while (listen) {
+            try {
+                // receive request
+                socket.receive(packet);
+               // System.out.println(packet.getData());  //checking the sound
+                RecordPlayback.sourceDataLine.write(packet.getData(), 0, 100);   //playing audio available in tempBuffer
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                listen = false;
+            }
         }
+        socket.close();
 
-        sourceDataLine.drain();
-        sourceDataLine.close();
+    }catch(Exception e){
+
+    	
     }
-
-    public static void toSpeaker(byte soundbytes[]) {
-        try 
-        {
-            System.out.println("At the speaker");
-            sourceDataLine.write(soundbytes, 0, soundbytes.length);
-        } catch (Exception e) {
-            System.out.println("Not working in speakers...");
-            e.printStackTrace();
-        }
     }
 }
